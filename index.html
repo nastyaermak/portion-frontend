@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <title>Порція — рецепти</title>
+  <style>
+    body { font-family: sans-serif; max-width: 800px; margin: 40px auto; padding: 0 16px; }
+    .recipe { border: 1px solid #ddd; border-radius: 8px; padding: 12px 16px; margin-bottom: 12px; }
+    .recipe h2 { margin: 0 0 6px; font-size: 20px; }
+    .meta { color: #666; }
+    .error { color: #b00020; }
+  </style>
+</head>
+<body>
+  <h1>Порція 🥗</h1>
+  <p>Рецепти з бекенду, КБЖВ на одну порцію.</p>
+  <div id="recipes">Завантаження…</div>
+
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script>
+    const API_URL = 'http://127.0.0.1:8000/api';
+
+    $.getJSON(API_URL + '/recipes')
+      .done(function (data) {
+        const list = $('#recipes').empty();
+        data.results.forEach(function (r) {
+          const n = r.nutrition_per_serving;
+          list.append(
+            $('<div class="recipe">').append(
+              $('<h2>').text(r.title),
+              $('<div class="meta">').text(r.category.name + ' · ' + r.cuisine.name + ' · ' +
+                r.cook_time_min + ' хв · автор: ' + r.author.display_name),
+              $('<div>').text(n.kcal + ' ккал · Б ' + n.protein + ' · Ж ' + n.fat + ' · В ' + n.carbs)
+            )
+          );
+        });
+      })
+      .fail(function () {
+        $('#recipes').html('<p class="error">Не вдалося отримати дані. Перевірте, що бекенд запущено на 127.0.0.1:8000.</p>');
+      });
+  </script>
+</body>
+</html>
