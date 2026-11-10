@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Порція — реєстрація</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header></header>
+
+  <h1>Реєстрація</h1>
+  <form id="register-form" class="card" novalidate>
+    <label>Username *
+      <input name="username" autocomplete="username" maxlength="150" required>
+    </label>
+    <label>Ім'я
+      <input name="first_name" autocomplete="given-name" maxlength="150">
+    </label>
+    <label>Прізвище
+      <input name="last_name" autocomplete="family-name" maxlength="150">
+    </label>
+    <label>Email *
+      <input name="email" type="email" autocomplete="email" maxlength="254" required>
+    </label>
+    <label>Пароль * <span class="meta">(від 8 символів, літери й цифри)</span>
+      <input name="password" type="password" autocomplete="new-password" maxlength="128" required>
+    </label>
+    <label>Повторіть пароль *
+      <input name="password_confirm" type="password" autocomplete="new-password" maxlength="128" required>
+    </label>
+    <button type="submit">Зареєструватися</button>
+    <p class="form-message"></p>
+    <p>Уже є акаунт? <a id="login-link" href="login.html">Увійти</a></p>
+  </form>
+
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    if (!redirectIfLoggedIn()) {
+      renderHeader();
+      $('#login-link').attr('href', 'login.html' + location.search);
+
+      // Швидка перевірка в браузері; остаточно все перевіряє бекенд
+      function validate(data) {
+        const errors = {};
+        if (!data.username) errors.username = 'Вкажіть username';
+        if (!data.email) errors.email = 'Вкажіть email';
+        else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+          errors.email = 'Email має бути у форматі name@example.com';
+        }
+        if (data.password.length < 8) errors.password = 'Пароль має бути не коротший за 8 символів';
+        else if (!/\d/.test(data.password) || !/[A-Za-zА-Яа-яЇїІіЄєҐґ]/.test(data.password)) {
+          errors.password = 'Пароль має містити хоча б одну літеру і цифру';
+        }
+        if (data.password !== data.password_confirm) errors.password_confirm = 'Паролі не збігаються';
+        return errors;
+      }
+
+      $('#register-form').on('submit', async function (e) {
+        e.preventDefault();
+        const form = $(this);
+        const data = {};
+        form.serializeArray().forEach((f) => { data[f.name] = f.name.startsWith('password') ? f.value : f.value.trim(); });
+
+        const errors = validate(data);
+        if (Object.keys(errors).length) {
+          showFieldErrors(form, { data: { message: 'Перевірте введені дані', fields: errors } });
+          return;
+        }
+        form.find('button').prop('disabled', true);
+        try {
+          await api('/auth/register', { method: 'POST', body: data });
+          // Одразу входимо, щоб не вводити дані вдруге
+          await login(data.username, data.password);
+          location.href = nextPage();
+        } catch (error) {
+          showFieldErrors(form, error);
+        } finally {
+          form.find('button').prop('disabled', false);
+        }
+      });
+    }
+  </script>
+</body>
+</html>
