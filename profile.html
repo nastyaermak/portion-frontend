@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Порція — мій кабінет</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header></header>
+
+  <h1>Мій кабінет</h1>
+  <p class="meta">Ця сторінка доступна тільки після входу.</p>
+
+  <div id="profile" class="box">Завантаження…</div>
+
+  <!-- Блок лише для адміністратора -->
+  <div id="admin-block" class="box hidden">
+    <h2>Адміністрування <span class="badge">тільки для адміністратора</span></h2>
+    <form id="category-form">
+      <input name="name" placeholder="Нова категорія" maxlength="100">
+      <button type="submit">Додати категорію</button>
+      <p class="form-message"></p>
+    </form>
+  </div>
+
+  <!-- Додати рецепт може будь-який залогінений користувач -->
+  <div class="box">
+    <h2>Додати рецепт</h2>
+    <form id="recipe-form" class="wide">
+      <label>Назва <input name="title" maxlength="200" required></label>
+      <label>Короткий опис <textarea name="description" rows="2"></textarea></label>
+      <div class="row">
+        <label>Категорія <select name="category_id"></select></label>
+        <label>Кухня <select name="cuisine_id"></select></label>
+      </div>
+      <div class="row">
+        <label>Порцій <input name="servings" type="number" min="1" value="1" required></label>
+        <label>Час, хв <input name="cook_time_min" type="number" min="1" value="15" required></label>
+      </div>
+      <div class="label">Інгредієнти (грами на весь рецепт)</div>
+      <div id="ingredient-rows"></div>
+      <input type="hidden" name="ingredients">
+      <button type="button" class="secondary" id="add-ingredient">+ інгредієнт</button>
+      <label>Кроки приготування — кожен з нового рядка
+        <textarea name="steps" rows="4" required></textarea>
+      </label>
+      <button type="submit">Додати рецепт</button>
+      <p class="form-message"></p>
+    </form>
+  </div>
+
+  <h2>Мої рецепти</h2>
+  <div id="my-recipes">Завантаження…</div>
+
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    let myId = null;
+    let ingredientOptions = [];
+
+    function loadMyRecipes() {
+      return api('/recipes?page_size=100&author=' + myId, { authRequired: true }).then(function (data) {
+        const list = $('#my-recipes').empty();
+        if (!data.results.length) list.text('Ви ще не додали жодного рецепта.');
+        data.results.forEach((r) => list.append(
+          $('<div class="recipe">').append(
+            $('<h2>').append($('<a>').attr('href', 'recipe.html?id=' + r.id).text(r.title)),
+            $('<div class="meta">').text(r.nutrition_per_serving.kcal + ' ккал на порцію · ' + r.cook_time_min + ' хв'),
+          ),
+        ));
+      });
+    }
+
+    function fillSelect(select, items) {
+      select.empty();
+      items.forEach((item) => select.append($('<option>').val(item.id).text(item.name)));
+    }
+
+    function addIngredientRow() {
+      const select = $('<select class="ingredient-id">');
+      fillSelect(select, ingredientOptions);
+      $('#ingredient-rows').append(
+        $('<div class="row ingredient-row">').append(
+          select,
+          $('<input class="ingredient-grams" type="number" min="0.1" step="0.1" placeholder="грами">'),
+          $('<button type="button" class="secondary">').text('✕').on('click', function () {
+            $(this).closest('.ingredient-row').remove();
+          }),
+        ),
+      );
+    }
+
+    if (requireAuth()) {
+      renderHeader();
+
+      // Довідники для форми рецепта
+      Promise.all([api('/categories'), api('/cuisines'), api('/ingredients?page_size=100')])
+        .then(function ([categories, cuisines, ingredients]) {
+          fillSelect($('[name=category_id]'), categories);
+          fillSelect($('[name=cuisine_id]'), cuisines);
+          ingredientOptions = ingredients.results.sort((a, b) => a.name.localeCompare(b.name, 'uk'));
+          addIngredientRow();
+        });
+
+      $('#add-ingredient').on('click', addIngredientRow);
+
+      $('#recipe-form').on('submit', async function (e) {
+        e.preventDefault();
+        const form = $(this);
+        const ingredients = form.find('.ingredient-row').map(function () {
+          return {
+            ingredient_id: Number($(this).find('.ingredient-id').val()),
+            amount_g: $(this).find('.ingredient-grams').val(),
+          };
+        }).get().filter((item) => item.amount_g !== '');
+        const body = {
+          title: form.find('[name=title]').val().trim(),
+          description: form.find('[name=description]').val().trim(),
+          category_id: Number(form.find('[name=category_id]').val()),
+          cuisine_id: Number(form.find('[name=cuisine_id]').val()),
+          servings: Number(form.find('[name=servings]').val()),
+          cook_time_min: Number(form.find('[name=cook_time_min]').val()),
+          ingredients,
+          steps: form.find('[name=steps]').val().split('\n').map((t) => t.trim()).filter(Boolean),
+        };
+        try {
+          const recipe = await api('/recipes', { method: 'POST', authRequired: true, body });
+          form.find('.field-error').remove();
+          form.find('.form-message').removeClass('error').addClass('success').text('Рецепт «' + recipe.title + '» додано');
+          form[0].reset();
+          $('#ingredient-rows').empty();
+          addIngredientRow();
+          loadMyRecipes();
+        } catch (error) {
+          showFieldErrors(form, error);
+        }
+      });
+
+      api('/me', { authRequired: true })
+        .then(function (me) {
+          auth.saveUserName(me.display_name || me.username);
+          renderHeader();
+          const g = me.daily_goal;
+          $('#profile').empty().append(
+            $('<h2>').text(me.display_name).append(me.is_admin ? ' <span class="badge">адміністратор</span>' : ''),
+            $('<div class="meta">').text('@' + me.username + ' · ' + me.email),
+            $('<p>').text(me.bio || 'Про себе ще нічого не написано.'),
+            $('<div>').text('Денна ціль: ' + (g.kcal ? g.kcal + ' ккал' : 'не задана')),
+          );
+          if (me.is_admin) $('#admin-block').removeClass('hidden');
+          myId = me.id;
+          return loadMyRecipes();
+        })
+        .catch(function (error) {
+          if (error.message !== 'session expired') {
+            $('#profile').html('<p class="error">Не вдалося завантажити дані.</p>');
+          }
+        });
+
+      $('#category-form').on('submit', async function (e) {
+        e.preventDefault();
+        const form = $(this);
+        try {
+          const category = await api('/categories', {
+            method: 'POST', authRequired: true, body: { name: form.find('[name=name]').val().trim() },
+          });
+          form.find('.form-message').removeClass('error').addClass('success').text('Категорію «' + category.name + '» додано');
+          form[0].reset();
+        } catch (error) {
+          showFieldErrors(form, error);
+        }
+      });
+    }
+  </script>
+</body>
+</html>

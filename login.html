@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Порція — вхід</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header></header>
+
+  <h1>Вхід</h1>
+  <form id="login-form" class="card" novalidate>
+    <label>Username
+      <input name="username" autocomplete="username" maxlength="150" required>
+    </label>
+    <label>Пароль
+      <input name="password" type="password" autocomplete="current-password" maxlength="128" required>
+    </label>
+    <button type="submit">Увійти</button>
+    <p class="form-message"></p>
+    <p>Немає акаунта? <a id="register-link" href="register.html">Зареєструватися</a></p>
+  </form>
+
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    if (!redirectIfLoggedIn()) {
+      renderHeader();
+      // Передаємо next далі, якщо користувач піде на реєстрацію
+      $('#register-link').attr('href', 'register.html' + location.search);
+
+      $('#login-form').on('submit', async function (e) {
+        e.preventDefault();
+        const form = $(this);
+        const username = form.find('[name=username]').val().trim();
+        const password = form.find('[name=password]').val();
+        form.find('.field-error').remove();
+        if (!username || !password) {
+          form.find('.form-message').addClass('error').text('Введіть username і пароль');
+          return;
+        }
+        form.find('button').prop('disabled', true);
+        try {
+          await login(username, password);
+          // Повертаємо на сторінку, з якої перенаправило на логін
+          location.href = nextPage();
+        } catch (error) {
+          showFieldErrors(form, error);
+        } finally {
+          form.find('button').prop('disabled', false);
+        }
+      });
+    }
+  </script>
+</body>
+</html>
