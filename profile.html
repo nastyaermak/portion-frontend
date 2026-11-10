@@ -65,7 +65,7 @@
         if (!data.results.length) list.text('Ви ще не додали жодного рецепта.');
         data.results.forEach((r) => list.append(
           $('<div class="recipe">').append(
-            $('<h2>').text(r.title),
+            $('<h2>').append($('<a>').attr('href', 'recipe.html?id=' + r.id).text(r.title)),
             $('<div class="meta">').text(r.nutrition_per_serving.kcal + ' ккал на порцію · ' + r.cook_time_min + ' хв'),
           ),
         ));

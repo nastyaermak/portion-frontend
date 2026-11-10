@@ -29,3 +29,6 @@ form.wide .ingredient-row select { margin-top: 0; }
 form.wide .ingredient-row button { flex: none; }
 form.wide #add-ingredient { margin-top: 8px; }
 form.wide button[type=submit] { margin-top: 16px; }
+.recipe h2 a { color: inherit; }
+.recipe h2 a:hover { color: #2e7d32; }
+a { color: #2e7d32; }

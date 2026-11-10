@@ -21,7 +21,7 @@
     function recipeCard(r) {
       const n = r.nutrition_per_serving;
       return $('<div class="recipe">').append(
-        $('<h2>').text(r.title),
+        $('<h2>').append($('<a>').attr('href', 'recipe.html?id=' + r.id).text(r.title)),
         $('<div class="meta">').text(r.category.name + ' · ' + r.cuisine.name + ' · ' +
           r.cook_time_min + ' хв · автор: ' + r.author.display_name),
         $('<div>').text(n.kcal + ' ккал · Б ' + n.protein + ' · Ж ' + n.fat + ' · В ' + n.carbs),

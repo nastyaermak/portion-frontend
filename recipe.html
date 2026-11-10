@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Порція — рецепт</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header></header>
+
+  <p><a href="index.html">← до всіх рецептів</a></p>
+  <div id="recipe">Завантаження…</div>
+
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    renderHeader();
+
+    const id = new URLSearchParams(location.search).get('id');
+
+    function render(r, me) {
+      const n = r.nutrition_per_serving;
+      const box = $('#recipe').empty();
+      box.append(
+        $('<h1>').text(r.title),
+        $('<div class="meta">').text(r.category.name + ' · ' + r.cuisine.name + ' · ' + r.cook_time_min +
+          ' хв · ' + r.servings + ' порц. · автор: ' + r.author.display_name),
+      );
+      if (r.description) box.append($('<p>').text(r.description));
+      box.append(
+        $('<div class="box">').append(
+          $('<strong>').text('На 1 порцію: '),
+          document.createTextNode(n.kcal + ' ккал · Б ' + n.protein + ' г · Ж ' + n.fat + ' г · В ' + n.carbs + ' г'),
+        ),
+        $('<h2>').text('Інгредієнти'),
+        $('<ul>').append(r.ingredients.map((item) => $('<li>').text(
+          item.ingredient.name + ' — ' + item.amount_g + ' г' + (item.note ? ' (' + item.note + ')' : ''),
+        ))),
+        $('<h2>').text('Приготування'),
+        $('<ol>').append(r.steps.map((step) => $('<li>').text(step))),
+      );
+
+      // Видалити може тільки автор або адміністратор (бекенд теж це перевіряє)
+      if (me && (me.id === r.author.id || me.is_admin)) {
+        const message = $('<p class="form-message">');
+        box.append(
+          $('<button class="secondary" id="delete-recipe">').text('Видалити рецепт').on('click', async function () {
+            if (!confirm('Видалити рецепт «' + r.title + '»?')) return;
+            try {
+              await api('/recipes/' + r.id, { method: 'DELETE', authRequired: true });
+              location.href = 'profile.html';
+            } catch (error) {
+              message.addClass('error').text(error.message);
+            }
+          }),
+          message,
+        );
+      }
+    }
+
+    if (!/^\d+$/.test(id || '')) {
+      $('#recipe').html('<p class="error">Рецепт не знайдено.</p>');
+    } else {
+      Promise.all([
+        api('/recipes/' + id),
+        auth.isLoggedIn() ? api('/me').catch(() => null) : null,
+      ])
+        .then(([recipe, me]) => render(recipe, me))
+        .catch(function (error) {
+          $('#recipe').html('<p class="error">' + (error.status === 404 ? 'Рецепт не знайдено.' : 'Не вдалося завантажити рецепт.') + '</p>');
+        });
+    }
+  </script>
+</body>
+</html>
