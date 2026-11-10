@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Порція — мій кабінет</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header></header>
+
+  <h1>Мій кабінет</h1>
+  <p class="meta">Ця сторінка доступна тільки після входу.</p>
+
+  <div id="profile" class="box">Завантаження…</div>
+
+  <!-- Блок лише для адміністратора -->
+  <div id="admin-block" class="box hidden">
+    <h2>Адміністрування <span class="badge">тільки для адміністратора</span></h2>
+    <form id="category-form">
+      <input name="name" placeholder="Нова категорія" maxlength="100">
+      <button type="submit">Додати категорію</button>
+      <p class="form-message"></p>
+    </form>
+  </div>
+
+  <h2>Мої рецепти</h2>
+  <div id="my-recipes">Завантаження…</div>
+
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    if (requireAuth()) {
+      renderHeader();
+
+      api('/me', { authRequired: true })
+        .then(function (me) {
+          auth.saveUserName(me.display_name || me.username);
+          renderHeader();
+          const g = me.daily_goal;
+          $('#profile').empty().append(
+            $('<h2>').text(me.display_name).append(me.is_admin ? ' <span class="badge">адміністратор</span>' : ''),
+            $('<div class="meta">').text('@' + me.username + ' · ' + me.email),
+            $('<p>').text(me.bio || 'Про себе ще нічого не написано.'),
+            $('<div>').text('Денна ціль: ' + (g.kcal ? g.kcal + ' ккал' : 'не задана')),
+          );
+          if (me.is_admin) $('#admin-block').removeClass('hidden');
+          return api('/recipes?author=' + me.id, { authRequired: true });
+        })
+        .then(function (data) {
+          const list = $('#my-recipes').empty();
+          if (!data.results.length) list.text('Ви ще не додали жодного рецепта.');
+          data.results.forEach((r) => list.append(
+            $('<div class="recipe">').append(
+              $('<h2>').text(r.title),
+              $('<div class="meta">').text(r.nutrition_per_serving.kcal + ' ккал на порцію · ' + r.cook_time_min + ' хв'),
+            ),
+          ));
+        })
+        .catch(function (error) {
+          if (error.message !== 'session expired') {
+            $('#profile').html('<p class="error">Не вдалося завантажити дані.</p>');
+          }
+        });
+
+      $('#category-form').on('submit', async function (e) {
+        e.preventDefault();
+        const form = $(this);
+        try {
+          const category = await api('/categories', {
+            method: 'POST', authRequired: true, body: { name: form.find('[name=name]').val().trim() },
+          });
+          form.find('.form-message').removeClass('error').addClass('success').text('Категорію «' + category.name + '» додано');
+          form[0].reset();
+        } catch (error) {
+          showFieldErrors(form, error);
+        }
+      });
+    }
+  </script>
+</body>
+</html>
